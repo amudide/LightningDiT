@@ -63,7 +63,7 @@ sample:
   reverse: false
   likelihood: false
   num_sampling_steps: 250
-  skip: 6
+  skip: [6]
   cfg_scale:
     6.7 # <---- cfg scale, for 800 epoch performance with FID=1.35 cfg_scale=6.7
     #       for 64 epoch performance with FID=2.11 cfg_scale=10.0
