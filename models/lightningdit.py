@@ -417,6 +417,36 @@ class LightningDiT(nn.Module):
             x, _ = x.chunk(2, dim=1)
         return x
 
+    def forward_bad(self, x, t=None, y=None, skip=None):
+        """
+        Forward pass of LightningDiT.
+        x: (N, C, H, W) tensor of spatial inputs (images or latent representations of images)
+        t: (N,) tensor of diffusion timesteps
+        y: (N,) tensor of class labels
+        use_checkpoint: boolean to toggle checkpointing
+        """
+
+        use_checkpoint = self.use_checkpoint
+
+        x = self.x_embedder(x) + self.pos_embed  # (N, T, D), where T = H * W / patch_size ** 2
+        t = self.t_embedder(t)                   # (N, D)
+        y = self.y_embedder(y, self.training)    # (N, D)
+        c = t + y                                # (N, D)
+
+        for i, block in enumerate(self.blocks):
+            if i not in skip:
+                if use_checkpoint:
+                    x = checkpoint(block, x, c, self.feat_rope, use_reentrant=True)
+                else:
+                    x = block(x, c, self.feat_rope)
+
+        x = self.final_layer(x, c)                # (N, T, patch_size ** 2 * out_channels)
+        x = self.unpatchify(x)                   # (N, out_channels, H, W)
+
+        if self.learn_sigma:
+            x, _ = x.chunk(2, dim=1)
+        return x
+
     def forward_with_cfg(self, x, t, y, cfg_scale, cfg_interval=None, cfg_interval_start=None):
         """
         Forward pass of LightningDiT, but also batches the unconditional forward pass for classifier-free guidance.
@@ -440,6 +470,29 @@ class LightningDiT(nn.Module):
 
         eps = torch.cat([half_eps, half_eps], dim=0)
         return torch.cat([eps, rest], dim=1)
+    
+    def forward_with_fg(self, x, t, y, cfg_scale, cfg_interval=None, cfg_interval_start=None, skip=None):
+        """
+        Forward pass of LightningDiT, but also batches the unconditional forward pass for classifier-free guidance.
+        """
+        # https://github.com/openai/glide-text2im/blob/main/notebooks/text2im.ipynb
+        model_out = self.forward(x, t, y)
+        model_out_bad = self.forward_bad(x, t, y, skip)
+        # For exact reproducibility reasons, we apply classifier-free guidance on only
+        # three channels by default. The standard approach to cfg applies it to all channels.
+        # This can be done by uncommenting the following line and commenting-out the line following that.
+        # eps, rest = model_out[:, :self.in_channels], model_out[:, self.in_channels:]
+        eps, rest = model_out[:, :3], model_out[:, 3:]
+        eps_bad, rest_bad = model_out_bad[:, :3], model_out_bad[:, 3:]
+        #cond_eps, uncond_eps = torch.split(eps, len(eps) // 2, dim=0)
+        eps_fg = eps_bad + cfg_scale * (eps - eps_bad)
+        
+        if cfg_interval is True:
+            timestep = t[0]
+            if timestep < cfg_interval_start:
+                eps_fg = eps
+
+        return torch.cat([eps_fg, rest], dim=1)
 
 def get_2d_sincos_pos_embed(embed_dim, grid_size, cls_token=False, extra_tokens=0):
     """
