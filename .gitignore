@@ -4,3 +4,7 @@ output/*
 tensorboard_logs
 *internal*
 guided-diffusion
+*.pt
+*.npz
+*.ipynb_checkpoints
+*__pycache__/

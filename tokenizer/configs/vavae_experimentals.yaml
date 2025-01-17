@@ -2,7 +2,7 @@
 # here is a training config in LDM-style
 # The params are all used for training, only 2 of them are used in this repo: ckpt_path and embed_dim.
 
-ckpt_path: /path/to/checkpoint.pt                             # <--------------- download ckpts from our hf space
+ckpt_path: vavae-imagenet256-f16d32-dinov2.pt                             # <--------------- download ckpts from our hf space
 
 model:
   base_learning_rate: 1.0e-04
