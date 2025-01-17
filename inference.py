@@ -32,6 +32,7 @@ def do_sample(train_config, accelerator, ckpt_path=None, cfg_scale=None, model=N
     folder_name = f"{train_config['model']['model_type'].replace('/', '-')}-ckpt-{ckpt_path.split('/')[-1].split('.')[0]}-{train_config['sample']['sampling_method']}-{train_config['sample']['num_sampling_steps']}".lower()
     if cfg_scale is None:
         cfg_scale = train_config['sample']['cfg_scale']
+    skip = train_config['sample']['skip']
     cfg_interval_start = train_config['sample']['cfg_interval_start'] if 'cfg_interval_start' in train_config['sample'] else 0
     timestep_shift = train_config['sample']['timestep_shift'] if 'timestep_shift' in train_config['sample'] else 0
     if cfg_scale > 1.0:
@@ -207,8 +208,8 @@ def do_sample(train_config, accelerator, ckpt_path=None, cfg_scale=None, model=N
                 z = torch.cat([z, z], 0)
                 y_null = torch.tensor([1000] * n, device=device)
                 y = torch.cat([y, y_null], 0)
-                model_kwargs = dict(y=y, cfg_scale=cfg_scale, cfg_interval=True, cfg_interval_start=cfg_interval_start)
-                model_fn = model.forward_with_cfg
+                model_kwargs = dict(y=y, cfg_scale=cfg_scale, cfg_interval=True, cfg_interval_start=cfg_interval_start, skip=skip)
+                model_fn = model.forward_with_fg
             else:
                 model_kwargs = dict(y=y)
                 model_fn = model.forward
@@ -294,3 +295,5 @@ if __name__ == "__main__":
                 sp_len = train_config['sample']['fid_num']
             )
             print_with_prefix('fid=',fid)
+            with open("results/skip-layer.txt", "a") as file:
+                print(f"Skip {train_config['sample']['skip']}, CFG {train_config['sample']['cfg_scale']}, CFG Interval {train_config['sample']['cfg_interval_start']} -- FID-{train_config['sample']['fid_num']} {fid}", file=file)
