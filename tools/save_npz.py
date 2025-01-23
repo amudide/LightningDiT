@@ -1,6 +1,8 @@
 import numpy as np
 from PIL import Image
 from tqdm import tqdm
+import argparse
+
 def create_npz_from_sample_folder(sample_dir, num=50_000):
     """
     Builds a single .npz file from a folder of .png samples.
@@ -16,5 +18,11 @@ def create_npz_from_sample_folder(sample_dir, num=50_000):
     np.savez(npz_path, arr_0=samples)
     print(f"Saved .npz file to {npz_path} [shape={samples.shape}].")
     return npz_path
+
 if __name__ == "__main__":
-    create_npz_from_sample_folder("/path/to/infer_folder")
+    parser = argparse.ArgumentParser(description="Create a .npz file from a folder of .png samples.")
+    parser.add_argument("sample_dir", type=str, help="Path to the folder containing .png samples")
+    parser.add_argument("--num", type=int, default=5_000, help="Number of samples to process (default: 5000)")
+    args = parser.parse_args()
+    
+    create_npz_from_sample_folder(args.sample_dir, num=args.num)

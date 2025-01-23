@@ -1,5 +1,5 @@
 pred_npz=$1
 
 python guided-diffusion/evaluations/evaluator.py \
-    /path/to/reference.npz \
+    VIRTUAL_imagenet256_labeled.npz \
     ${pred_npz}

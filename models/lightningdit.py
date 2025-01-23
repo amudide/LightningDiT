@@ -249,6 +249,32 @@ class LightningDiTBlock(nn.Module):
         x = x + gate_mlp.unsqueeze(1) * self.mlp(modulate(self.norm2(x), shift_mlp, scale_mlp))
         return x
 
+    @torch.compile
+    def forward_skip_mlp(self, x, c, feat_rope=None):
+        if self.wo_shift:
+            scale_msa, gate_msa, scale_mlp, gate_mlp = self.adaLN_modulation(c).chunk(4, dim=1)
+            shift_msa = None
+            shift_mlp = None
+        else:
+            shift_msa, scale_msa, gate_msa, shift_mlp, scale_mlp, gate_mlp = self.adaLN_modulation(c).chunk(6, dim=1)
+            
+        x = x + gate_msa.unsqueeze(1) * self.attn(modulate(self.norm1(x), shift_msa, scale_msa), rope=feat_rope)
+        #x = x + gate_mlp.unsqueeze(1) * self.mlp(modulate(self.norm2(x), shift_mlp, scale_mlp))
+        return x
+
+    @torch.compile
+    def forward_skip_attn(self, x, c, feat_rope=None):
+        if self.wo_shift:
+            scale_msa, gate_msa, scale_mlp, gate_mlp = self.adaLN_modulation(c).chunk(4, dim=1)
+            shift_msa = None
+            shift_mlp = None
+        else:
+            shift_msa, scale_msa, gate_msa, shift_mlp, scale_mlp, gate_mlp = self.adaLN_modulation(c).chunk(6, dim=1)
+            
+        #x = x + gate_msa.unsqueeze(1) * self.attn(modulate(self.norm1(x), shift_msa, scale_msa), rope=feat_rope)
+        x = x + gate_mlp.unsqueeze(1) * self.mlp(modulate(self.norm2(x), shift_mlp, scale_mlp))
+        return x
+
 class FinalLayer(nn.Module):
     """
     The final layer of LightningDiT.
@@ -409,6 +435,43 @@ class LightningDiT(nn.Module):
                 x = checkpoint(block, x, c, self.feat_rope, use_reentrant=True)
             else:
                 x = block(x, c, self.feat_rope)
+
+        x = self.final_layer(x, c)                # (N, T, patch_size ** 2 * out_channels)
+        x = self.unpatchify(x)                   # (N, out_channels, H, W)
+
+        if self.learn_sigma:
+            x, _ = x.chunk(2, dim=1)
+        return x
+
+    def forward_intervene(self, x, t, y, cfg_scale, cfg_interval=None, cfg_interval_start=None, skip=None):
+        """
+        Forward pass of LightningDiT.
+        x: (N, C, H, W) tensor of spatial inputs (images or latent representations of images)
+        t: (N,) tensor of diffusion timesteps
+        y: (N,) tensor of class labels
+        use_checkpoint: boolean to toggle checkpointing
+        """
+
+        use_checkpoint = self.use_checkpoint
+
+        x = self.x_embedder(x) + self.pos_embed  # (N, T, D), where T = H * W / patch_size ** 2
+        t = self.t_embedder(t)                   # (N, D)
+        y = self.y_embedder(y, self.training)    # (N, D)
+        c = t + y                                # (N, D)
+
+        for i, block in enumerate(self.blocks):
+            if i not in skip:
+                if use_checkpoint:
+                    x = checkpoint(block, x, c, self.feat_rope, use_reentrant=True)
+                else:
+                    x = block(x, c, self.feat_rope)
+            else:
+                if use_checkpoint:
+                    tmp = checkpoint(block, x, c, self.feat_rope, use_reentrant=True)
+                    x = x + cfg_scale * (tmp - x)
+                else:
+                    tmp = block(x, c, self.feat_rope)
+                    x = x + cfg_scale * (tmp - x)
 
         x = self.final_layer(x, c)                # (N, T, patch_size ** 2 * out_channels)
         x = self.unpatchify(x)                   # (N, out_channels, H, W)
