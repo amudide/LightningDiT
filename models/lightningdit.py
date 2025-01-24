@@ -545,8 +545,8 @@ class LightningDiT(nn.Module):
         # three channels by default. The standard approach to cfg applies it to all channels.
         # This can be done by uncommenting the following line and commenting-out the line following that.
         # eps, rest = model_out[:, :self.in_channels], model_out[:, self.in_channels:]
-        eps, rest = model_out[:, :3], model_out[:, 3:]
-        eps_bad, rest_bad = model_out_bad[:, :3], model_out_bad[:, 3:]
+        eps, rest = model_out[:, :self.in_channels], model_out[:, self.in_channels:]
+        eps_bad, rest_bad = model_out_bad[:, :self.in_channels], model_out_bad[:, self.in_channels:]
         #cond_eps, uncond_eps = torch.split(eps, len(eps) // 2, dim=0)
         eps_fg = eps_bad + cfg_scale * (eps - eps_bad)
         

@@ -63,11 +63,11 @@ sample:
   reverse: false
   likelihood: false
   num_sampling_steps: 250
-  skip: [6]
-  cfg_scale: 6.7
+  skip: [7]
+  cfg_scale: 2.4
 
   # recommend to use default settings
   per_proc_batch_size: 128
-  fid_num: 50000
-  cfg_interval_start: 0.125
+  fid_num: 5000
+  cfg_interval_start: 0.025
   timestep_shift: 0.3

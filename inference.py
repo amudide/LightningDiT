@@ -36,7 +36,7 @@ def do_sample(train_config, accelerator, ckpt_path=None, cfg_scale=None, model=N
     cfg_interval_start = train_config['sample']['cfg_interval_start'] if 'cfg_interval_start' in train_config['sample'] else 0
     timestep_shift = train_config['sample']['timestep_shift'] if 'timestep_shift' in train_config['sample'] else 0
     if cfg_scale > 1.0:
-        folder_name += f"-intervene{skip}"
+        folder_name += f"-skip4channel{skip}"
         folder_name += f"-interval{cfg_interval_start:.2f}"+f"-cfg{cfg_scale:.2f}"
         folder_name += f"-shift{timestep_shift:.2f}"
 
@@ -205,19 +205,10 @@ def do_sample(train_config, accelerator, ckpt_path=None, cfg_scale=None, model=N
             y = torch.randint(0, train_config['data']['num_classes'], (n,), device=device)
             
             # Setup classifier-free guidance:
-            if using_cfg:
-                z = torch.cat([z, z], 0)
-                y_null = torch.tensor([1000] * n, device=device)
-                y = torch.cat([y, y_null], 0)
-                model_kwargs = dict(y=y, cfg_scale=cfg_scale, cfg_interval=True, cfg_interval_start=cfg_interval_start, skip=skip)
-                model_fn = model.forward_intervene
-            else:
-                model_kwargs = dict(y=y)
-                model_fn = model.forward
+            model_kwargs = dict(y=y, cfg_scale=cfg_scale, cfg_interval=True, cfg_interval_start=cfg_interval_start, skip=skip)
+            model_fn = model.forward_with_fg
 
             samples = sample_fn(z, model_fn, **model_kwargs)[-1]
-            if using_cfg:
-                samples, _ = samples.chunk(2, dim=0)  # Remove null class samples
 
             samples = (samples * latent_std) / latent_multiplier + latent_mean
             samples = vae.decode_to_images(samples)
@@ -296,5 +287,5 @@ if __name__ == "__main__":
                 sp_len = train_config['sample']['fid_num']
             )
             print_with_prefix('fid=',fid)
-            with open("results/intervene.txt", "a") as file:
+            with open("results/skip-layer-4channel.txt", "a") as file:
                 print(f"Swap {train_config['sample']['skip']}, CFG {train_config['sample']['cfg_scale']}, CFG Interval {train_config['sample']['cfg_interval_start']} -- FID-{train_config['sample']['fid_num']} {fid}", file=file)

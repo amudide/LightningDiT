@@ -5,8 +5,8 @@ TEMPLATE_CONFIG="configs/reproductions/lightningdit_xl_vavae_f16d32_800ep_cfg.ya
 
 # Values for `skip`, `cfg_scale`, and `cfg_interval_start`
 SKIP_VALUES=(7)
-CFG_SCALE_VALUES=(1.05 1.10 1.15)
-CFG_INTERVAL_START_VALUES=(0.0)  # Add your desired values
+CFG_SCALE_VALUES=(1.4 1.5 1.6 1.7)
+CFG_INTERVAL_START_VALUES=(0.025)  # Add your desired values
 
 # Loop through each combination
 for SKIP in "${SKIP_VALUES[@]}"; do
